@@ -238,6 +238,7 @@ footer a{color:var(--accent2);text-decoration:none}
       <div class="pay-row total"><span class="lbl">Total</span><span class="val" id="pay-amt">$2.99</span></div>
     </div>
     <button class="btn btn-p" id="pay-btn" onclick="handlePay()">Pay Securely with Square →</button>
+    <div id="pay-error" style="display:none;margin-top:.7rem;padding:.6rem .85rem;border-radius:8px;font-size:.82rem;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.25);color:#ff6b6b;line-height:1.5"></div>
     <p class="secure-note"><span>🔒 Secured by Square</span> · Instant access after payment</p>
   </div>
 
@@ -463,8 +464,13 @@ function getFormData(){
   return fd;
 }
 
+function showPayErr(msg){const el=document.getElementById('pay-error');if(el){el.textContent=msg;el.style.display='block';}}
+function clearPayErr(){const el=document.getElementById('pay-error');if(el)el.style.display='none';}
+
 async function handlePay(){
+  clearPayErr();
   const btn=document.getElementById('pay-btn');
+  const orig=btn.textContent;
   btn.textContent='Creating payment link…'; btn.disabled=true;
   const fd=getFormData();
   localStorage.setItem('meddispute_form',JSON.stringify(fd));
@@ -477,8 +483,8 @@ async function handlePay(){
         redirectUrl:'https://contactinfinitysolutionsllc-ops.github.io/meddispute/?paid=true'})});
     const data=await r.json();
     if(data.url){window.location.href=data.url;}
-    else{btn.textContent='Pay Securely with Square →';btn.disabled=false;alert('Could not create payment link. Please try again.');}
-  }catch{btn.textContent='Pay Securely with Square →';btn.disabled=false;alert('Payment error. Please try again.');}
+    else{btn.textContent=orig;btn.disabled=false;showPayErr('Could not create payment link. Please try again.');}
+  }catch{btn.textContent=orig;btn.disabled=false;showPayErr('Payment error. Please try again.');}
 }
 
 async function generateDoc(){
@@ -492,7 +498,7 @@ async function generateDoc(){
   try{
     const prompt=PROMPTS[type](fd);
     const r=await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'claude',prompt})});
+      body:JSON.stringify({action:'claude',prompt,email:getStoredSession()?.email||localStorage.getItem('ig_account_email')||''})});
     const data=await r.json();
     genDoc=data.result||'Error generating letter. Please contact support.';
   }catch{genDoc='There was an error. Please try again or contact contact.infinitysolutionsllc@gmail.com';}
@@ -508,16 +514,18 @@ async function generateDoc(){
 }
 
 function copyDoc(btn){
+  const orig=btn.textContent;
   navigator.clipboard.writeText(genDoc).then(()=>{
     btn.textContent='✓ Copied!'; btn.classList.add('ok');
-    setTimeout(()=>{btn.textContent='📋 Copy';btn.classList.remove('ok');},2000);
+    setTimeout(()=>{btn.textContent=orig;btn.classList.remove('ok');},2000);
   });
 }
 
 function dlDoc(){
+  const date=new Date().toISOString().slice(0,10);
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([genDoc],{type:'text/plain'}));
-  a.download=(selectedName||'dispute_letter').replace(/\s+/g,'_')+'.txt';
+  a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(genDoc);
+  a.download=(selectedName||'dispute_letter').replace(/\s+/g,'_')+'-'+date+'.txt';
   a.click();
 }
 
@@ -629,6 +637,5 @@ function showSignInBar() {
   }
 })();
 </script>
-<script src="https://contactinfinitysolutionsllc-ops.github.io/account/ig-account.js"></script>
 </body>
 </html>
